@@ -10,8 +10,8 @@
 SDL_Window* mainWindow;
 SDL_Renderer* boardR;
 
-int distance(int x1, int y1, int x2, int y2) {
-	return std::abs(std::sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2)));
+double distance(int x1, int y1, int x2, int y2) {
+	return std::sqrt(pow(x1 - x2, 2) + pow(y1 - y2, 2));
 }
 
 void fatalError(std::string fatal) {
@@ -22,46 +22,15 @@ void fatalError(std::string fatal) {
 	exit(-1);
 }
 
-//ALGORTIHM TAKEN FROM http://content.gpwiki.org/index.php/SDL:Tutorials:Drawing_and_Filling_Circles
-void draw_circle(SDL_Renderer* renderer, int n_cx, int n_cy, int radius)
-{
-	// if the first pixel in the screen is represented by (0,0) (which is in sdl)
-	// remember that the beginning of the circle is not in the middle of the pixel
-	// but to the left-top from it:
 
-	double error = (double)-radius;
-	double x = (double)radius - 0.5;
-	double y = (double)0.5;
-	double cx = n_cx - 0.5;
-	double cy = n_cy - 0.5;
-
-	while (x >= y){
-		SDL_RenderDrawPoint(renderer, (int)(cx + x), (int)(cy + y));
-		SDL_RenderDrawPoint(renderer, (int)(cx + y), (int)(cy + x));
-
-		if (x != 0){
-			SDL_RenderDrawPoint(renderer, (int)(cx - x), (int)(cy + y));
-			SDL_RenderDrawPoint(renderer, (int)(cx + y), (int)(cy - x));
-		}
-
-		if (y != 0){
-			SDL_RenderDrawPoint(renderer, (int)(cx + x), (int)(cy - y));
-			SDL_RenderDrawPoint(renderer, (int)(cx - y), (int)(cy + x));
-		}
-
-		if (x != 0 && y != 0){
-			SDL_RenderDrawPoint(renderer, (int)(cx - x), (int)(cy - y));
-			SDL_RenderDrawPoint(renderer, (int)(cx - y), (int)(cy - x));
-		}
-
-		error += y;
-		++y;
-		error += y;
-
-		if (error >= 0){
-			--x;
-			error -= x;
-			error -= x;
+void draw_circle(SDL_Renderer* renderer, int x, int y, int radius){
+	double dist;
+	for (int i = x-radius; i < x+radius; i++) {
+		for (int j = y - radius; j < y + radius; j++) {
+			dist = distance(x, y, i, j);
+			if (dist <= radius && dist > radius - 1) {
+				SDL_RenderDrawPoint(renderer, i, j);
+			}
 		}
 	}
 }
@@ -78,15 +47,6 @@ SDL_Texture* loadTexture(std::string path, SDL_Renderer* rend) {
 	return t;
 }
 
-int modulo(int number, int mod) {//mod which suits my needs
-	if (number >= 0) {
-		return number%mod;
-	}
-	else {
-		return number+mod*(1+(int) number/mod);
-	}
-}
-
 int main(int argc, char* argv) {
 	//SETUP
 	
@@ -96,8 +56,8 @@ int main(int argc, char* argv) {
 	}
 
 	//window creation
-	int size = 501;
-	mainWindow = SDL_CreateWindow("Memes", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, size, size, SDL_WINDOW_SHOWN);
+	int size = 500;
+	mainWindow = SDL_CreateWindow("Holo Chess", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, size, size, SDL_WINDOW_SHOWN);
 	if (mainWindow == NULL) {
 		fatalError("window was not initialized");
 	}
@@ -150,9 +110,24 @@ int main(int argc, char* argv) {
 	playerRect.h = size / 16;
 	playerRect.w = size / 16;
 
+	int checkerColor[2][3];
+
+	checkerColor[0][0] = 0x99;
+	checkerColor[0][1] = 0x65;
+	checkerColor[0][2] = 0x15;
+
+	checkerColor[1][0] = 0x42;
+	checkerColor[1][1] = 0x18;
+	checkerColor[1][2] = 0x05;
+
+	int selectedColors[3];
+	selectedColors[0] = 150;
+	selectedColors[1] = 150;
+	selectedColors[2] = 150;
+
 	int playerPos[] = { (firstRadius + secondRadius) / 2 , (secondRadius + centerRadius) / 2 , 0};
 	int selected[2] = { -1, 0 };
-	float turn = 1;//-1 if blue, 1 if red
+	float turn = -1;//-1 if blue, 1 if red
 	int previous[2];
 	int oldBoard[3][12];
 	int win = 0;
@@ -164,97 +139,82 @@ int main(int argc, char* argv) {
 			SDL_SetRenderDrawColor(boardR, 0, 0, 0, 255);
 			SDL_RenderClear(boardR);
 			SDL_SetRenderDrawColor(boardR, 255, 255, 255, 255);
-			
-			//draw outline
-			SDL_SetRenderDrawColor(boardR, 255, 255, 255, 255);
-			draw_circle(boardR, size / 2, size / 2, centerRadius);
-			draw_circle(boardR, size / 2, size / 2, firstRadius);
-			draw_circle(boardR, size / 2, size / 2, secondRadius);
-			for (int i = 0; i < 12; i++) {
-				SDL_RenderDrawLine(boardR,
-					size / 2 + centerRadius*cos(M_PI*i / 6),
-					size / 2 + centerRadius*sin(M_PI*i / 6),
-					size / 2 + firstRadius*cos(M_PI*i / 6),
-					size / 2 + firstRadius*sin(M_PI*i / 6)
-					);
-			}
-
-			//draw background
+			int bgcolor[3];
 			if (win == 0) {
 				if (turn == -1) {
-					SDL_SetRenderDrawColor(boardR, 0, 0, 25, 255);
+					bgcolor[0] = 0;
+					bgcolor[1] = 0;
+					bgcolor[2] = 25;
 				}
 				else if (turn == 1) {
-					SDL_SetRenderDrawColor(boardR, 25, 0, 0, 255);
+					bgcolor[0] = 25;
+					bgcolor[1] = 0;
+					bgcolor[2] = 0;
 				}
 			}
 			else {
 				exit = true;
 				if (win == 1) {
-					SDL_SetRenderDrawColor(boardR, 255, 0, 0, 255);
+					bgcolor[0] = 255;
+					bgcolor[1] = 0;
+					bgcolor[2] = 0;
 				}
 				else if (win == -1) {
-					SDL_SetRenderDrawColor(boardR, 0, 0, 255, 255);
+					bgcolor[0] = 0;
+					bgcolor[1] = 0;
+					bgcolor[2] = 255;
 				}
 				else if (win == 2) {
-					SDL_SetRenderDrawColor(boardR, 150, 150, 150, 255);
+					bgcolor[0] = 150;
+					bgcolor[1] = 150;
+					bgcolor[2] = 150;
 				}
 			}
+
+			//draw background
+			double angle;
+			double cangle;
 			for (int i = 0; i < size; i++) {
 				for (int j = 0; j < size; j++) {
-					if (distance(size / 2, size / 2, i, j)>firstRadius) {
-						SDL_RenderDrawPoint(boardR, i, j);
+					double dist = distance(size / 2, size / 2, i, j);
+					if (dist>firstRadius) {
+						SDL_SetRenderDrawColor(boardR, bgcolor[0], bgcolor[1], bgcolor[2], 255);
 					}
+					cangle = atan2(size / 2 - j, size / 2 - i) + M_PI;
+					for (int k = 0; k<12; k++) {
+						angle = k*M_PI / 6;
+						if (cangle >= selected[1]*M_PI/6 && cangle < (selected[1]+1) * M_PI / 6 && dist>secondRadius && dist <= firstRadius && selected[0] == 0) {
+							SDL_SetRenderDrawColor(boardR, selectedColors[0], selectedColors[1], selectedColors[2], 255);
+						}
+						else if (cangle >= selected[1]*M_PI/6 && cangle < (selected[1] + 1) * M_PI / 6 && dist>centerRadius && dist <= secondRadius && selected[0] == 1) {
+							SDL_SetRenderDrawColor(boardR, selectedColors[0], selectedColors[1], selectedColors[2], 255);
+						}
+						else if (dist<firstRadius && dist>secondRadius && angle < cangle && angle + M_PI / 6 >= cangle) {
+							SDL_SetRenderDrawColor(boardR, checkerColor[k % 2][0], checkerColor[k % 2][1], checkerColor[k % 2][2], 255);
+						}
+						else if (dist<secondRadius && dist>centerRadius  && angle < cangle && angle + M_PI / 6 >= cangle) {
+							SDL_SetRenderDrawColor(boardR, checkerColor[(k + 1) % 2][0], checkerColor[(k + 1) % 2][1], checkerColor[(k + 1) % 2][2], 255);
+						}
+					}
+					if (dist<centerRadius) {
+						if (selected[0] == 2) {
+							SDL_SetRenderDrawColor(boardR, selectedColors[0], selectedColors[1], selectedColors[2], 255);
+						}
+						else {
+							SDL_SetRenderDrawColor(boardR, checkerColor[0][0], checkerColor[0][1], checkerColor[0][2], 255);
+						}
+					}
+
+					if ((dist <= firstRadius + 1 && dist>firstRadius) || (dist <= centerRadius + 1 && dist>centerRadius)) {
+						SDL_SetRenderDrawColor(boardR, checkerColor[1][0], checkerColor[1][1], checkerColor[1][2], 255);
+					}
+					SDL_RenderDrawPoint(boardR, i, j);
 				}
 			}
 
 			SDL_SetRenderDrawColor(boardR, 90, 90, 90, 255);
 
-			//draw selected sector
-			{
-				double angle;
-				double dist;
-				if (selected[0] == 0) {
-					for (int i = 1; i < size; i++) {
-						for (int j = 1; j < size; j++) {
-							angle = atan2(size / 2 - j, size / 2 - i);
-							dist = distance(size/2,size/2,j,i);
-							if (
-								(angle < M_PI*(selected[1] + 1) / 6 - M_PI && angle > M_PI*selected[1] / 6 - M_PI)
-								&&
-								(dist<firstRadius && dist>secondRadius)//distance correct
-								) {
-								SDL_RenderDrawPoint(boardR, i, j);
-							}
-						}
-					}
-				}
-				else if (selected[0] == 1) {
-					for (int i = 1; i < size; i++) {
-						for (int j = 1; j < size; j++) {
-							angle = atan2(size / 2 - j, size / 2 - i);
-							dist = distance(size / 2, size / 2, j, i);
-							if (
-								(angle < M_PI*(selected[1] + 1) / 6 - M_PI && angle > M_PI*selected[1] / 6 - M_PI)
-								&&
-								(dist<secondRadius && dist>centerRadius)//distance correct
-								) {
-								SDL_RenderDrawPoint(boardR, i, j);
-							}
-						}
-					}
-				}
-				else if (selected[0] == 2) {
-					for (int i = 1; i < size; i++) {
-						for (int j = 1; j < size; j++) {
-							dist = distance(size / 2, size / 2, j, i);
-							if (dist<centerRadius) {
-								SDL_RenderDrawPoint(boardR, i, j);
-							}
-						}
-					}
-				}
-			}
+
 			//draw players
 			for (int j = 0; j < 3;j++){	
 				for (int i = 0; i < sizeof(board[0]) / sizeof(int); i++) {
@@ -316,10 +276,9 @@ int main(int argc, char* argv) {
 				
 				
 				//movement
-				std::cout << board[selected[0]][selected[1]]<<std::endl;
 				if (selected[0] != -1 && previous[0] != -1 && board[selected[0]][selected[1]] == 0 && (//must be able to move
 					((selected[0] == previous[0] && ((abs(selected[1] - previous[1]) == 1) || abs(selected[1] - previous[1]) == 11))) ||//horizontal movement
-					(abs(selected[0] - previous[0]) == 1 && selected[1] == previous[1] || ((selected[0] == 2) != (previous[0] == 2)))//vertical
+					(abs(selected[0] - previous[0]) == 1 && selected[1] == previous[1] || ((selected[0] == 2 && previous[0] == 1) != (previous[0] == 2 && selected[0] == 1)))//vertical
 					)
 					) {
 						board[selected[0]][selected[1]] = board[previous[0]][previous[1]];
